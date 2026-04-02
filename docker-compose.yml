@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  # ──────────────────────────────────────────────
+  # PostgreSQL Database
+  # ──────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: location-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: location_demo
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Auto-run migrations & seed on first start
+      - ./backend/migrations/001_create_tables.up.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./backend/migrations/002_add_posts_stats_trending.up.sql:/docker-entrypoint-initdb.d/02-schema-phase2.sql
+      - ./backend/migrations/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql
+      - ./backend/migrations/seed_phase2.sql:/docker-entrypoint-initdb.d/04-seed-phase2.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ──────────────────────────────────────────────
+  # Go Backend API
+  # ──────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: location-backend
+    environment:
+      SERVER_PORT: "8088"
+      DB_HOST: db
+      DB_PORT: "5432"  # internal Docker network port, not the host port
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: location_demo
+      DB_SSLMODE: disable
+    ports:
+      - "8088:8088"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ──────────────────────────────────────────────
+  # Next.js Frontend
+  # ──────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: location-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8088/api/v1
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

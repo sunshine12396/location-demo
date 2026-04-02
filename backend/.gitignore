@@ -1,0 +1,28 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+*.out
+*.prof
+
+# Output binaries
+/api
+/bin/
+
+# Dependency directories
+vendor/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
