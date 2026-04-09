@@ -2,285 +2,322 @@ package location
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 
 	"github.com/example/location-demo/internal/domain"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-// PostgresRepository implements domain.LocationRepository using PostgreSQL.
+// PostgresRepository implements domain.LocationRepository using GORM.
 type PostgresRepository struct {
-	db *sql.DB
+	db *gorm.DB
 }
 
 // NewPostgresRepository creates a new repository instance.
-func NewPostgresRepository(db *sql.DB) *PostgresRepository {
+func NewPostgresRepository(db *gorm.DB) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
-// ──────────────────────────────────────────────
-// Location Queries
-// ──────────────────────────────────────────────
+// GetByID retrieves a location with its translated name, parent info, and stats.
+func (r *PostgresRepository) GetByExternalID(ctx context.Context, externalID string) (*domain.Location, error) {
+	var loc domain.Location
+	err := r.db.WithContext(ctx).Table("locations").Where("external_id = ?", externalID).First(&loc).Error
+	if err != nil {
+		return nil, err
+	}
+	return &loc, nil
+}
 
 // GetByID retrieves a location with its translated name, parent info, and stats.
 func (r *PostgresRepository) GetByID(ctx context.Context, id int64, lang string) (*domain.LocationDetail, error) {
-	query := `
-		SELECT
-			l.id, l.type, l.lat, l.lng,
-			COALESCE(l.slug, '') AS slug,
-			COALESCE(l.is_verified, FALSE) AS is_verified,
-			COALESCE(lt.name, '') AS name,
-			l.parent_id,
-			COALESCE(pt.name, '') AS parent_name,
-			COALESCE(p.type, '') AS parent_type
-		FROM locations l
-		LEFT JOIN location_translations lt ON lt.location_id = l.id AND lt.lang_code = $2
-		LEFT JOIN locations p ON p.id = l.parent_id
-		LEFT JOIN location_translations pt ON pt.location_id = p.id AND pt.lang_code = $2
-		WHERE l.id = $1
-	`
+	var loc domain.Location
+	err := r.db.WithContext(ctx).
+		Preload("Translations", "lang_code = ?", lang).
+		Preload("Parent").
+		Preload("Parent.Translations", "lang_code = ?", lang).
+		Preload("Stats").
+		First(&loc, id).Error
 
-	detail := &domain.LocationDetail{}
-	var parentID sql.NullInt64
-	var parentName, parentType string
-
-	err := r.db.QueryRowContext(ctx, query, id, lang).Scan(
-		&detail.ID, &detail.Type, &detail.Lat, &detail.Lng,
-		&detail.Slug, &detail.IsVerified,
-		&detail.Name,
-		&parentID, &parentName, &parentType,
-	)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("location %d not found", id)
-		}
 		return nil, fmt.Errorf("repository.GetByID: %w", err)
 	}
 
-	if parentID.Valid {
-		detail.Parent = &domain.LocationSummary{
-			ID:   parentID.Int64,
-			Name: parentName,
-			Type: domain.LocationType(parentType),
-		}
+	// Fallback Strategy: If requested translation missing, try 'en' then any available node.
+	if len(loc.Translations) == 0 {
+		r.db.WithContext(ctx).Table("location_translations").
+			Where("location_id = ?", id).
+			Order("CASE WHEN lang_code = 'en' THEN 0 ELSE 1 END").
+			Limit(1).Find(&loc.Translations)
 	}
 
-	// Attach stats (non-blocking — stats may not exist yet)
-	stats, _ := r.GetStats(ctx, id)
-	detail.Stats = stats
+	if loc.Parent != nil && len(loc.Parent.Translations) == 0 {
+		r.db.WithContext(ctx).Table("location_translations").
+			Where("location_id = ?", loc.Parent.ID).
+			Order("CASE WHEN lang_code = 'en' THEN 0 ELSE 1 END").
+			Limit(1).Find(&loc.Parent.Translations)
+	}
+
+	// Map domain.Location to domain.LocationDetail
+	name := ""
+	formattedAddress := ""
+	shortFormattedAddress := ""
+	if len(loc.Translations) > 0 {
+		name = loc.Translations[0].Name
+		formattedAddress = loc.Translations[0].FormattedAddress
+		shortFormattedAddress = loc.Translations[0].ShortFormattedAddress
+	}
+
+	detail := &domain.LocationDetail{
+		ID:                    loc.ID,
+		ExternalID:            loc.ExternalID,
+		Name:                  name,
+		FormattedAddress:      formattedAddress,
+		ShortFormattedAddress: shortFormattedAddress,
+		Type:                  loc.Type,
+		Lat:                   loc.Lat,
+		Lng:                   loc.Lng,
+		Provider:              loc.Provider,
+		UpdatedAt:             loc.UpdatedAt,
+		Stats:                 loc.Stats,
+	}
+
+	if loc.Parent != nil {
+		parentName := ""
+		if len(loc.Parent.Translations) > 0 {
+			parentName = loc.Parent.Translations[0].Name
+		}
+		detail.Parent = &domain.LocationSummary{
+			ID:   loc.Parent.ID,
+			Name: parentName,
+			Type: loc.Parent.Type,
+		}
+	}
 
 	return detail, nil
 }
 
-// SearchByAlias searches the alias table using case-insensitive LIKE matching.
-func (r *PostgresRepository) SearchByAlias(ctx context.Context, query string) ([]domain.SearchResult, error) {
-	sqlQuery := `
-		SELECT l.id, COALESCE(lt.name, la.alias) AS name, l.type
-		FROM location_alias la
-		JOIN locations l ON l.id = la.location_id
-		LEFT JOIN location_translations lt ON lt.location_id = l.id AND lt.lang_code = 'en'
-		WHERE LOWER(la.alias) LIKE LOWER($1)
-		LIMIT 10
-	`
+// SearchByAlias searches the alias table using case-insensitive match and optional type filter.
+func (r *PostgresRepository) SearchByAlias(ctx context.Context, query string, locType *domain.LocationType) ([]domain.SearchResult, error) {
+	var results []domain.SearchResult
+	q := r.db.WithContext(ctx).Table("location_aliases la").
+		Select("l.id, COALESCE(lt.name, MAX(la.alias)) AS name, l.type").
+		Joins("JOIN locations l ON l.id = la.location_id").
+		Joins("LEFT JOIN location_translations lt ON lt.location_id = l.id AND lt.lang_code = ?", "en").
+		Where("LOWER(la.alias) LIKE ?", "%"+strings.ToLower(query)+"%").
+		Group("l.id, l.type, lt.name")
 
-	return r.querySearchResults(ctx, sqlQuery, "%"+query+"%")
+	if locType != nil {
+		q = q.Where("l.type = ?", *locType)
+	}
+
+	err := q.Limit(10).Scan(&results).Error
+	return results, err
 }
 
-// SearchByTranslation searches translations using case-insensitive LIKE.
-func (r *PostgresRepository) SearchByTranslation(ctx context.Context, query string, lang string) ([]domain.SearchResult, error) {
-	sqlQuery := `
-		SELECT l.id, lt.name, l.type
-		FROM location_translations lt
-		JOIN locations l ON l.id = lt.location_id
-		WHERE lt.lang_code = $1 AND LOWER(lt.name) LIKE LOWER($2)
-		LIMIT 10
-	`
+// SearchByTranslation searches translations using case-insensitive match and optional type filter.
+func (r *PostgresRepository) SearchByTranslation(ctx context.Context, query string, lang string, locType *domain.LocationType) ([]domain.SearchResult, error) {
+	var results []domain.SearchResult
+	q := r.db.WithContext(ctx).Table("location_translations lt").
+		Select("l.id, lt.name, l.type").
+		Joins("JOIN locations l ON l.id = lt.location_id").
+		Where("lt.lang_code = ? AND LOWER(lt.name) LIKE ?", lang, "%"+strings.ToLower(query)+"%")
 
-	return r.querySearchResults(ctx, sqlQuery, lang, "%"+query+"%")
+	if locType != nil {
+		q = q.Where("l.type = ?", *locType)
+	}
+
+	err := q.Limit(10).Scan(&results).Error
+	return results, err
 }
 
-// InsertLocation creates a new location along with its translations and aliases in a transaction.
+// InsertLocation creates a new location with its associations automatically.
 func (r *PostgresRepository) InsertLocation(ctx context.Context, loc *domain.Location, translations []domain.LocationTranslation, aliases []domain.LocationAlias) (int64, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, fmt.Errorf("repository.InsertLocation: begin tx: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Assign associations
+		loc.Translations = translations
+		loc.Aliases = aliases
 
-	// Insert location
-	var id int64
-	err = tx.QueryRowContext(ctx, `
-		INSERT INTO locations (external_id, type, lat, lng, parent_id, path)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (external_id) DO UPDATE SET external_id = EXCLUDED.external_id
-		RETURNING id
-	`, loc.ExternalID, loc.Type, loc.Lat, loc.Lng, loc.ParentID, loc.Path).Scan(&id)
-	if err != nil {
-		return 0, fmt.Errorf("repository.InsertLocation: insert location: %w", err)
-	}
+		// 2. Insert location with Upsert logic for high-concurrency safety
+		err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "external_id"}},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"lat":        loc.Lat,
+				"lng":        loc.Lng,
+				"updated_at": gorm.Expr("NOW()"),
+			}),
+		}).Create(loc).Error
 
-	// Insert translations
-	for _, t := range translations {
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO location_translations (location_id, lang_code, name)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (location_id, lang_code) DO UPDATE SET name = EXCLUDED.name
-		`, id, t.LangCode, t.Name)
 		if err != nil {
-			return 0, fmt.Errorf("repository.InsertLocation: insert translation: %w", err)
+			return err
 		}
-	}
 
-	// Insert aliases
-	for _, a := range aliases {
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO location_alias (location_id, alias)
-			VALUES ($1, $2)
-		`, id, strings.ToLower(a.Alias))
-		if err != nil {
-			return 0, fmt.Errorf("repository.InsertLocation: insert alias: %w", err)
+		// 3. Populate ID if not returned (depends on driver behavior during conflict updates)
+		if loc.ID == 0 && loc.ExternalID != "" {
+			if err := tx.Select("id").Table("locations").Where("external_id = ?", loc.ExternalID).First(&loc.ID).Error; err != nil {
+				return err
+			}
 		}
-	}
 
-	if err = tx.Commit(); err != nil {
-		return 0, fmt.Errorf("repository.InsertLocation: commit: %w", err)
-	}
+		// Update path using hierarchy logic
+		var path string
+		if loc.ParentID != nil {
+			var parent domain.Location
+			tx.Select("path").First(&parent, *loc.ParentID)
+			path = fmt.Sprintf("%s.%d", parent.Path, loc.ID)
+		} else {
+			path = fmt.Sprintf("%d", loc.ID)
+		}
 
-	return id, nil
+		return tx.Model(loc).Update("path", path).Error
+	})
+	return loc.ID, err
+}
+
+// AddTranslation adds a single translation for a location.
+func (r *PostgresRepository) AddTranslation(ctx context.Context, trans *domain.LocationTranslation) error {
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "location_id"}, {Name: "lang_code"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"name",
+			"formatted_address",
+			"short_formatted_address",
+		}),
+	}).Create(trans).Error
 }
 
 // GetChildren returns direct children of a parent location.
 func (r *PostgresRepository) GetChildren(ctx context.Context, parentID int64, lang string) ([]domain.SearchResult, error) {
-	sqlQuery := `
-		SELECT l.id, COALESCE(lt.name, '') AS name, l.type
-		FROM locations l
-		LEFT JOIN location_translations lt ON lt.location_id = l.id AND lt.lang_code = $2
-		WHERE l.parent_id = $1
-		ORDER BY lt.name
-	`
+	var results []domain.SearchResult
+	err := r.db.WithContext(ctx).Table("locations l").
+		Select("l.id, COALESCE(lt.name, '') AS name, l.type").
+		Joins("LEFT JOIN LATERAL (SELECT name FROM location_translations WHERE location_id = l.id ORDER BY (CASE WHEN lang_code = ? THEN 0 WHEN lang_code = 'en' THEN 1 ELSE 2 END) LIMIT 1) lt ON true", lang).
+		Where("l.parent_id = ?", parentID).
+		Order("lt.name").
+		Scan(&results).Error
 
-	return r.querySearchResults(ctx, sqlQuery, parentID, lang)
+	return results, err
+}
+
+// UpdateLocation updates core attributes of a location and bumps updated_at.
+func (r *PostgresRepository) UpdateLocation(ctx context.Context, loc *domain.Location) error {
+	return r.db.WithContext(ctx).Table("locations").Where("id = ?", loc.ID).Updates(map[string]interface{}{
+		"type":          loc.Type,
+		"external_type": loc.ExternalType,
+		"lat":           loc.Lat,
+		"lng":           loc.Lng,
+		"updated_at":    gorm.Expr("NOW()"),
+	}).Error
+}
+
+// ReplaceAliases clears existing aliases and replaces them with new ones.
+func (r *PostgresRepository) ReplaceAliases(ctx context.Context, locationID int64, aliases []domain.LocationAlias) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Table("location_aliases").Where("location_id = ?", locationID).Delete(&domain.LocationAlias{}).Error; err != nil {
+			return err
+		}
+		for i := range aliases {
+			aliases[i].LocationID = locationID
+			if err := tx.Table("location_aliases").Create(&aliases[i]).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // ──────────────────────────────────────────────
 // Post Queries
 // ──────────────────────────────────────────────
 
-// CreatePost inserts a new post and updates location_stats atomically.
+// CreatePost inserts a new post and updates location_stats using GORM builder.
 func (r *PostgresRepository) CreatePost(ctx context.Context, post *domain.Post) (*domain.Post, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("repository.CreatePost: begin tx: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. Insert the post
+		if err := tx.Create(post).Error; err != nil {
+			return err
+		}
 
-	// 1. Insert the post
-	err = tx.QueryRowContext(ctx, `
-		INSERT INTO posts (user_id, content, media_type, location_id)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, created_at
-	`, post.UserID, post.Content, post.MediaType, post.LocationID).Scan(&post.ID, &post.CreatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("repository.CreatePost: insert post: %w", err)
-	}
+		// 2. Upsert location_stats using builder
+		scoreInc := 1.0
+		if post.MediaType == "photo" {
+			scoreInc = 2.5
+		} else if post.MediaType == "video" {
+			scoreInc = 3.0
+		}
 
-	// 2. Upsert location_stats — increment the correct counter
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO location_stats (location_id, total_posts, total_photos, total_videos, last_post_at, trending_score)
-		VALUES ($1, 1,
-			CASE WHEN $2 = 'photo' THEN 1 ELSE 0 END,
-			CASE WHEN $2 = 'video' THEN 1 ELSE 0 END,
-			NOW(),
-			1.0 + CASE WHEN $2 = 'photo' THEN 1.5 WHEN $2 = 'video' THEN 2.0 ELSE 0 END
-		)
-		ON CONFLICT (location_id) DO UPDATE SET
-			total_posts    = location_stats.total_posts + 1,
-			total_photos   = location_stats.total_photos + CASE WHEN $2 = 'photo' THEN 1 ELSE 0 END,
-			total_videos   = location_stats.total_videos + CASE WHEN $2 = 'video' THEN 1 ELSE 0 END,
-			last_post_at   = NOW(),
-			trending_score = location_stats.trending_score + 1.0
-				+ CASE WHEN $2 = 'photo' THEN 1.5 WHEN $2 = 'video' THEN 2.0 ELSE 0 END
-	`, post.LocationID, post.MediaType)
-	if err != nil {
-		return nil, fmt.Errorf("repository.CreatePost: update stats: %w", err)
-	}
+		photoInc := 0
+		if post.MediaType == "photo" {
+			photoInc = 1
+		}
+		videoInc := 0
+		if post.MediaType == "video" {
+			videoInc = 1
+		}
 
-	if err = tx.Commit(); err != nil {
-		return nil, fmt.Errorf("repository.CreatePost: commit: %w", err)
-	}
+		return tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "location_id"}},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"total_posts":    gorm.Expr("location_stats.total_posts + ?", 1),
+				"total_photos":   gorm.Expr("location_stats.total_photos + ?", photoInc),
+				"total_videos":   gorm.Expr("location_stats.total_videos + ?", videoInc),
+				"last_post_at":   gorm.Expr("NOW()"),
+				"trending_score": gorm.Expr("location_stats.trending_score + ?", scoreInc),
+			}),
+		}).Create(&domain.LocationStats{
+			LocationID:    post.LocationID,
+			TotalPosts:    1,
+			TotalPhotos:   int64(photoInc),
+			TotalVideos:   int64(videoInc),
+			LastPostAt:    &post.CreatedAt,
+			TrendingScore: scoreInc,
+		}).Error
+	})
 
-	return post, nil
+	return post, err
 }
 
-// GetPostsByLocation returns posts for a location and all its descendants, joined with location name.
+// GetPostsByLocation returns posts for a location and descendants using builder.
 func (r *PostgresRepository) GetPostsByLocation(ctx context.Context, locationID int64, lang string, limit, offset int) ([]domain.PostWithLocation, error) {
-	// First, get the path of the target location
-	var path string
-	err := r.db.QueryRowContext(ctx, "SELECT path FROM locations WHERE id = $1", locationID).Scan(&path)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// Location might exist but have no path, or it might just have no posts.
-			// Revert to direct match if we can't find a path
-			path = "" 
-		} else {
-			return nil, fmt.Errorf("repository.GetPostsByLocation: fetching path: %w", err)
-		}
-	}
-
-	var query string
-	var rows *sql.Rows
-
-	if path != "" {
-		query = `
-			SELECT
-				p.id, p.user_id, p.content, p.media_type,
-				p.location_id, COALESCE(lt.name, '') AS location_name, l.type AS location_type,
-				p.created_at
-			FROM posts p
-			JOIN locations l ON l.id = p.location_id
-			LEFT JOIN location_translations lt ON lt.location_id = l.id AND lt.lang_code = $2
-			WHERE l.path LIKE $1 || '%'
-			ORDER BY p.created_at DESC
-			LIMIT $3 OFFSET $4
-		`
-		rows, err = r.db.QueryContext(ctx, query, path, lang, limit, offset)
-	} else {
-		// Fallback to exact match
-		query = `
-			SELECT
-				p.id, p.user_id, p.content, p.media_type,
-				p.location_id, COALESCE(lt.name, '') AS location_name, l.type AS location_type,
-				p.created_at
-			FROM posts p
-			JOIN locations l ON l.id = p.location_id
-			LEFT JOIN location_translations lt ON lt.location_id = l.id AND lt.lang_code = $2
-			WHERE p.location_id = $1
-			ORDER BY p.created_at DESC
-			LIMIT $3 OFFSET $4
-		`
-		rows, err = r.db.QueryContext(ctx, query, locationID, lang, limit, offset)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("repository.GetPostsByLocation: %w", err)
-	}
-	defer rows.Close()
+	var loc domain.Location
+	r.db.WithContext(ctx).Select("path").First(&loc, locationID)
 
 	var posts []domain.PostWithLocation
-	for rows.Next() {
-		var p domain.PostWithLocation
-		if err := rows.Scan(
-			&p.ID, &p.UserID, &p.Content, &p.MediaType,
-			&p.LocationID, &p.LocationName, &p.LocationType,
-			&p.CreatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("repository.GetPostsByLocation: scan: %w", err)
-		}
-		posts = append(posts, p)
+	query := r.db.WithContext(ctx).Table("posts p").
+		Select("p.id, p.user_id, p.content, p.media_type, p.location_id, COALESCE(lt.name, '') AS location_name, l.type AS location_type, p.created_at").
+		Joins("JOIN locations l ON l.id = p.location_id").
+		Joins("LEFT JOIN LATERAL (SELECT name FROM location_translations WHERE location_id = l.id ORDER BY (CASE WHEN lang_code = ? THEN 0 WHEN lang_code = 'en' THEN 1 ELSE 2 END) LIMIT 1) lt ON true", lang)
+
+	if loc.Path != "" {
+		query = query.Where("l.path <@ ?", loc.Path)
+	} else {
+		query = query.Where("p.location_id = ?", locationID)
 	}
 
-	return posts, rows.Err()
+	err := query.Order("p.created_at DESC").Limit(limit).Offset(offset).Scan(&posts).Error
+	return posts, err
+}
+
+// GetPosts returns all recent posts across all locations, with optional filtering.
+func (r *PostgresRepository) GetPosts(ctx context.Context, locationID *int64, lang string, limit, offset int) ([]domain.PostWithLocation, error) {
+	var posts []domain.PostWithLocation
+	query := r.db.WithContext(ctx).Table("posts p").
+		Select("p.id, p.user_id, p.content, p.media_type, p.location_id, COALESCE(lt.name, '') AS location_name, l.type AS location_type, p.created_at").
+		Joins("JOIN locations l ON l.id = p.location_id").
+		Joins("LEFT JOIN LATERAL (SELECT name FROM location_translations WHERE location_id = l.id ORDER BY (CASE WHEN lang_code = ? THEN 0 WHEN lang_code = 'en' THEN 1 ELSE 2 END) LIMIT 1) lt ON true", lang)
+
+	if locationID != nil && *locationID > 0 {
+		var loc domain.Location
+		if err := r.db.WithContext(ctx).Select("path").First(&loc, *locationID).Error; err == nil && loc.Path != "" {
+			query = query.Where("l.path <@ ?", loc.Path)
+		} else {
+			query = query.Where("p.location_id = ?", *locationID)
+		}
+	}
+
+	err := query.Order("p.created_at DESC").Limit(limit).Offset(offset).Scan(&posts).Error
+	return posts, err
 }
 
 // ──────────────────────────────────────────────
@@ -289,87 +326,46 @@ func (r *PostgresRepository) GetPostsByLocation(ctx context.Context, locationID 
 
 // GetStats returns the pre-aggregated stats for a location.
 func (r *PostgresRepository) GetStats(ctx context.Context, locationID int64) (*domain.LocationStats, error) {
-	query := `
-		SELECT location_id, total_posts, total_photos, total_videos, last_post_at, trending_score
-		FROM location_stats
-		WHERE location_id = $1
-	`
-
-	stats := &domain.LocationStats{}
-	var lastPostAt sql.NullTime
-
-	err := r.db.QueryRowContext(ctx, query, locationID).Scan(
-		&stats.LocationID, &stats.TotalPosts, &stats.TotalPhotos,
-		&stats.TotalVideos, &lastPostAt, &stats.TrendingScore,
-	)
+	var stats domain.LocationStats
+	err := r.db.WithContext(ctx).Table("location_stats").Where("location_id = ?", locationID).First(&stats).Error
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // No stats yet — not an error
-		}
-		return nil, fmt.Errorf("repository.GetStats: %w", err)
+		return nil, nil // Silently return nil for no stats
 	}
-
-	if lastPostAt.Valid {
-		stats.LastPostAt = &lastPostAt.Time
-	}
-
-	return stats, nil
+	return &stats, nil
 }
 
 // GetTrending returns top trending locations ordered by score.
 func (r *PostgresRepository) GetTrending(ctx context.Context, lang string, limit int) ([]domain.TrendingLocation, error) {
-	query := `
-		SELECT
-			ls.location_id,
-			COALESCE(lt.name, '') AS name,
-			l.type,
-			ls.trending_score AS score
-		FROM location_stats ls
-		JOIN locations l ON l.id = ls.location_id
-		LEFT JOIN location_translations lt ON lt.location_id = l.id AND lt.lang_code = $1
-		WHERE ls.trending_score > 0
-		ORDER BY ls.trending_score DESC
-		LIMIT $2
-	`
-
-	rows, err := r.db.QueryContext(ctx, query, lang, limit)
-	if err != nil {
-		return nil, fmt.Errorf("repository.GetTrending: %w", err)
-	}
-	defer rows.Close()
-
 	var results []domain.TrendingLocation
-	for rows.Next() {
-		var t domain.TrendingLocation
-		if err := rows.Scan(&t.LocationID, &t.Name, &t.Type, &t.Score); err != nil {
-			return nil, fmt.Errorf("repository.GetTrending: scan: %w", err)
-		}
-		results = append(results, t)
-	}
+	err := r.db.WithContext(ctx).Table("location_stats ls").
+		Select("ls.location_id, COALESCE(lt.name, '') AS name, l.type, ls.trending_score AS score").
+		Joins("JOIN locations l ON l.id = ls.location_id").
+		Joins("LEFT JOIN LATERAL (SELECT name FROM location_translations WHERE location_id = l.id ORDER BY (CASE WHEN lang_code = ? THEN 0 WHEN lang_code = 'en' THEN 1 ELSE 2 END) LIMIT 1) lt ON true", lang).
+		Where("ls.trending_score > 0").
+		Order("ls.trending_score DESC").
+		Limit(limit).
+		Scan(&results).Error
 
-	return results, rows.Err()
+	return results, err
 }
 
-// ──────────────────────────────────────────────
-// Helpers
-// ──────────────────────────────────────────────
+// FindByParentAndName searches for a location by name, type, and specific parent_id scoping.
+func (r *PostgresRepository) FindByParentAndName(ctx context.Context, parentID *int64, name string, locType domain.LocationType, lang string) (*domain.Location, error) {
+	var loc domain.Location
+	query := r.db.WithContext(ctx).Table("locations l").
+		Select("l.id, l.type, l.external_type, l.lat, l.lng, l.parent_id, l.path, l.provider, l.created_at, l.updated_at").
+		Joins("JOIN location_translations lt ON lt.location_id = l.id").
+		Where("lt.name = ? AND lt.lang_code = ? AND l.type = ?", name, lang, locType)
 
-// querySearchResults is a helper to avoid duplicating scan logic.
-func (r *PostgresRepository) querySearchResults(ctx context.Context, query string, args ...interface{}) ([]domain.SearchResult, error) {
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	if parentID != nil {
+		query = query.Where("l.parent_id = ?", *parentID)
+	} else {
+		query = query.Where("l.parent_id IS NULL")
+	}
+
+	err := query.First(&loc).Error
 	if err != nil {
-		return nil, fmt.Errorf("repository.querySearchResults: %w", err)
+		return nil, err
 	}
-	defer rows.Close()
-
-	var results []domain.SearchResult
-	for rows.Next() {
-		var sr domain.SearchResult
-		if err := rows.Scan(&sr.ID, &sr.Name, &sr.Type); err != nil {
-			return nil, fmt.Errorf("repository.querySearchResults: scan: %w", err)
-		}
-		results = append(results, sr)
-	}
-
-	return results, rows.Err()
+	return &loc, nil
 }

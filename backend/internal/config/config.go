@@ -17,6 +17,7 @@ type Config struct {
 	DBName         string
 	DBSSLMode      string
 	ExternalAPIKey string
+	LocationSyncDays int
 }
 
 // Load reads configuration from environment variables.
@@ -33,7 +34,17 @@ func Load() *Config {
 		DBName:         getEnv("DB_NAME", "location_demo"),
 		DBSSLMode:      getEnv("DB_SSLMODE", "disable"),
 		ExternalAPIKey: getEnv("EXTERNAL_API_KEY", ""),
+		LocationSyncDays: getEnvAsInt("LOCATION_SYNC_DAYS", 30),
 	}
+}
+
+func getEnvAsInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		var val int
+		fmt.Sscanf(v, "%d", &val)
+		return val
+	}
+	return fallback
 }
 
 // DSN returns the PostgreSQL connection string.

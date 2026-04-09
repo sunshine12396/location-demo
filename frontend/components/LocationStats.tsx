@@ -11,7 +11,7 @@ interface LocationStatsProps {
 
 export default function LocationStats({ location, language }: LocationStatsProps) {
   const stats = location.stats || { total_posts: 0, total_photos: 0, total_videos: 0, trending_score: 0 };
-  
+
   const chartData = [
     {
       name: 'Posts',
@@ -44,12 +44,6 @@ export default function LocationStats({ location, language }: LocationStatsProps
               <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest bg-blue-500 text-white shadow-inner">
                 {location.type}
               </span>
-              {location.is_verified && (
-                <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  VERIFIED LOCATION
-                </span>
-              )}
             </div>
           </div>
         </div>
@@ -101,27 +95,6 @@ export default function LocationStats({ location, language }: LocationStatsProps
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
-
-      {/* Geospatial Navigation */}
-      <div className="bg-slate-800/20 rounded-2xl p-5 border border-slate-700/30 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Geospatial Coordinates</p>
-          <div className="flex gap-2">
-            <span className="text-[10px] font-mono text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded">{location.lat.toFixed(6)}</span>
-            <span className="text-[10px] font-mono text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded">{location.lng.toFixed(6)}</span>
-          </div>
-        </div>
-        
-        <a 
-          href={`http://www.google.com/maps/place/${location.lat},${location.lng}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 group"
-        >
-          <Globe className="w-4 h-4 text-blue-500 group-hover:rotate-12 transition-transform" />
-          External Navigation Alpha
-        </a>
       </div>
     </div>
   );

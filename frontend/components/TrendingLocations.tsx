@@ -10,11 +10,13 @@ import { cn } from '@/lib/utils';
 interface TrendingLocationsProps {
   language: string;
   customOnSelect?: (id: number) => void;
+  refreshTrigger?: number;
 }
 
 export default function TrendingLocations({
   language,
   customOnSelect,
+  refreshTrigger = 0,
 }: TrendingLocationsProps) {
 
   const [trending, setTrending] = useState<TrendingLocation[]>([]);
@@ -32,9 +34,9 @@ export default function TrendingLocations({
       }
     };
     fetchTrending();
-  }, [language]);
+  }, [language, refreshTrigger]);
 
-  if (loading) {
+  if (loading && trending.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-500">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />

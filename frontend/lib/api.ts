@@ -3,12 +3,13 @@
 
 const IS_SERVER = typeof window === 'undefined';
 const API_BASE = IS_SERVER
-  ? (process.env.INTERNAL_API_URL || "http://backend:8088/api/v1")
+  ? (process.env.INTERNAL_API_URL || "http://localhost:8088/api/v1")
   : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8088/api/v1");
 
 
 export interface SearchResult {
   id: number;
+  external_id?: string;
   name: string;
   type: string;
   country?: string;
@@ -20,8 +21,6 @@ export interface LocationDetail {
   type: string;
   lat: number;
   lng: number;
-  is_verified?: boolean;
-  slug?: string;
   parent?: {
     id: number;
     name: string;
@@ -69,15 +68,40 @@ export interface ApiResponse<T> {
  */
 export async function searchLocations(
   query: string,
-  lang: string = "en"
+  lang: string = "en",
+  type?: string
 ): Promise<SearchResult[]> {
-  const params = new URLSearchParams({ q: query, lang });
-  const res = await fetch(`${API_BASE}/locations/search?${params}`);
+  const params: Record<string, string> = { q: query, lang };
+  if (type) params.type = type;
+  const searchParams = new URLSearchParams(params);
+  const res = await fetch(`${API_BASE}/locations/search?${searchParams}`);
 
   if (!res.ok) {
     throw new Error(`Search failed: ${res.statusText}`);
   }
 
+  const json: ApiResponse<SearchResult[]> = await res.json();
+  return json.data || [];
+}
+
+/**
+ * Autocomplete from Google (via BE)
+ */
+export async function autocompleteLocations(query: string, lang: string = "en"): Promise<SearchResult[]> {
+  const params = new URLSearchParams({ q: query, lang });
+  const res = await fetch(`${API_BASE}/locations/autocomplete?${params}`);
+  if (!res.ok) throw new Error("Autocomplete failed");
+  const json: ApiResponse<SearchResult[]> = await res.json();
+  return json.data || [];
+}
+
+/**
+ * Local-only search (only locations already in DB)
+ */
+export async function localSearchLocations(query: string, lang: string = "en"): Promise<SearchResult[]> {
+  const params = new URLSearchParams({ q: query, lang });
+  const res = await fetch(`${API_BASE}/locations/local-search?${params}`);
+  if (!res.ok) throw new Error("Local search failed");
   const json: ApiResponse<SearchResult[]> = await res.json();
   return json.data || [];
 }
@@ -143,20 +167,57 @@ export async function getPostsByLocation(locationId: number, lang: string = "en"
 }
 
 /**
- * Create a new post
+ * Hydrate an external location into the local DB and return its local ID.
  */
-export async function createPost(content: string, mediaType: string, locationId: number): Promise<Post> {
+export async function hydrateLocation(externalId: string, lang: string = "en"): Promise<number> {
+  const res = await fetch(`${API_BASE}/locations/hydrate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ external_id: externalId, lang })
+  });
+  if (!res.ok) throw new Error("Hydration failed");
+  const json: ApiResponse<{ id: number }> = await res.json();
+  return json.data.id;
+}
+
+/**
+ * Create a new post.
+ * Can be called with either locationId (internal) or externalId (Google Place ID).
+ */
+export async function createPost(
+  content: string,
+  mediaType: string,
+  locationId?: number,
+  externalId?: string,
+  lang: string = "en"
+): Promise<Post> {
   const res = await fetch(`${API_BASE}/posts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       content,
       media_type: mediaType,
-      location_id: locationId
+      location_id: locationId,
+      external_id: externalId,
+      lang: lang
     })
   });
-  
+
   if (!res.ok) throw new Error("Failed to create post");
   const json: ApiResponse<Post> = await res.json();
   return json.data;
+}
+
+/**
+ * Get all recent posts (global feed) with optional location filter
+ */
+export async function getPosts(lang: string = "en", limit: number = 20, offset: number = 0, locationId?: number): Promise<Post[]> {
+  const params: any = { lang, limit: limit.toString(), offset: offset.toString() };
+  if (locationId) params.location_id = locationId.toString();
+
+  const searchParams = new URLSearchParams(params);
+  const res = await fetch(`${API_BASE}/posts?${searchParams}`);
+  if (!res.ok) throw new Error("Failed to fetch posts");
+  const json: ApiResponse<Post[]> = await res.json();
+  return json.data || [];
 }

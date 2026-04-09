@@ -9,10 +9,11 @@
 This demo covers:
 
 - ✅ Smart search with alias matching (`"sai gon"` → Ho Chi Minh City)
-- ✅ Multi-language display (EN / VI / JA)
+- ✅ Multi-language display (EN / VI / JA) with dynamic post-level overrides
 - ✅ Location hierarchy (Country → City → District → Landmark)
-- ✅ External API fallback (OpenStreetMap Nominatim Default)
-- ❌ No posts, trending, or stats (out of scope for this demo)
+- ✅ External API fallback (Google Places API JIT Hydration)
+- ✅ Social Discovery Hub: Real-time global feeds scoped by geographical nodes
+- ✅ Trending Algorithms: Dynamically computed Popular Nodes
 
 ---
 
@@ -38,10 +39,11 @@ graph TD
     end
 
     CC -->|"GET /api/v1/locations/search"| H
+    CC -->|"POST /api/v1/posts"| H
     SC -->|"GET /api/v1/locations/:id"| H
     H --> SVC
     SVC --> REPO
-    SVC -.->|"fallback"| EXT
+    SVC -.->|"Google Places API / Autocomplete"| EXT
     REPO --> DB
     SEED -.-> DB
 ```
@@ -59,7 +61,7 @@ graph TD
 
 ## 3. Database Schema
 
-Three core tables. No posts, stats, or trending (out of scope).
+Core tables designed using raw SQL migrations but queried seamlessly via **GORM**. Includes advanced locations tracking and social post mapping.
 
 ### 3.1 `locations`
 
@@ -94,6 +96,20 @@ CREATE TABLE location_alias (
     id SERIAL PRIMARY KEY,
     location_id INTEGER REFERENCES locations(id) ON DELETE CASCADE,
     alias TEXT NOT NULL
+);+
+```
+
+### 3.4 `posts` (Social Layer)
+
+```sql
+CREATE TABLE posts (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    location_id INTEGER REFERENCES locations(id),
+    content TEXT NOT NULL,
+    media_url VARCHAR(500),
+    media_type VARCHAR(50) DEFAULT 'text',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
 
@@ -102,9 +118,9 @@ CREATE TABLE location_alias (
 | id | name | type | parent_id | path |
 | -- | ---- | ---- | --------- | ---- |
 | 1 | Vietnam | country | NULL | `1` |
-| 2 | Ho Chi Minh City | city | 1 | `1/2` |
-| 4 | District 1 | district | 2 | `1/2/4` |
-| 5 | Bitexco Tower | landmark | 4 | `1/2/4/5` |
+| 2 | Ho Chi Minh | city | 1 | `1.2` |
+| 4 | District 1 | district | 2 | `1.2.4` |
+| 5 | Bitexco Tower | landmark | 4 | `1.2.4.5` |
 
 ---
 
@@ -156,14 +172,15 @@ type ExternalLocationProvider interface {
 }
 ```
 
-### 4.3 Search Strategy (Waterfall)
+### 4.3 Search Strategy (Waterfall & JIT Hydration)
 
-The service implements a fallback chain to maximize cache hits and minimize external API costs:
+The service implements a fallback chain to maximize cache hits and minimize external API costs. It seamlessly links with Google Places for "Save on Intent" (Just-In-Time) hydration:
 
 ```
 1. SearchByAlias    →  "sai gon" matches alias → return Ho Chi Minh City
 2. SearchByTranslation → "Hồ Chí Minh" matches vi translation → return
-3. External API     →  Call OpenStreetMap → save to DB → return
+3. External API     →  Call Google Places API Autocomplete
+4. JIT Hydration    →  On post creation, missing Google Places nodes are fully resolved along with their hierarchical parents via concurrent UPSERTs and saved into the DB natively.
 ```
 
 ### 4.4 REST API Endpoints
@@ -296,11 +313,11 @@ Languages: English (en), Vietnamese (vi), Japanese (ja)
 | 1 | Database schema + migrations | ✅ Done |
 | 2 | Seed data (Vietnam + Japan) | ✅ Done |
 | 3 | Go domain models + interfaces | ✅ Done |
-| 4 | PostgreSQL repository | ✅ Done |
-| 5 | Location service (waterfall search) | ✅ Done |
+| 4 | PostgreSQL GORM repository | ✅ Done |
+| 5 | Location service + Google Autocomplete | ✅ Done |
 | 6 | HTTP handlers + router | ✅ Done |
-| 7 | Next.js search page | ✅ Done |
-| 8 | Next.js detail page | ✅ Done |
-| 9 | Docker Compose | ✅ Done |
-| 10 | External API integration | 🔲 Optional |
-| 11 | Map view + nearby search | 🔲 Optional |
+| 7 | Next.js Dashboard / Live Feeds | ✅ Done |
+| 8 | Missing Node Hydration & UPSERT | ✅ Done |
+| 9 | Trending Algorithms (Popular Nodes) | ✅ Done |
+| 10| Dynamic Language Overrides | ✅ Done |
+| 11| Map view | ✅ Done |

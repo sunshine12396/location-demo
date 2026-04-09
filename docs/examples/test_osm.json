@@ -1,0 +1,188 @@
+[
+    {
+        "place_id": 395973901,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "way",
+        "osm_id": 589117047,
+        "lat": "10.5056098",
+        "lon": "107.1414616",
+        "class": "highway",
+        "type": "tertiary",
+        "place_rank": 26,
+        "importance": 0.053384517433432484,
+        "addresstype": "road",
+        "name": "Lê Đại Hành",
+        "display_name": "Lê Đại Hành, Hải Dinh, Phường Long Hương, Thành phố Hồ Chí Minh, 78106, Việt Nam",
+        "address": {
+            "road": "Lê Đại Hành",
+            "neighbourhood": "Hải Dinh",
+            "city_district": "Phường Long Hương",
+            "city": "Thành phố Hồ Chí Minh",
+            "ISO3166-2-lvl4": "VN-SG",
+            "postcode": "78106",
+            "country": "Việt Nam",
+            "country_code": "vn"
+        },
+        "boundingbox": [
+            "10.4995626",
+            "10.5116571",
+            "107.1414038",
+            "107.1414877"
+        ]
+    },
+    {
+        "place_id": 237397730,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "way",
+        "osm_id": 235399808,
+        "lat": "10.7663397",
+        "lon": "106.6540810",
+        "class": "highway",
+        "type": "secondary",
+        "place_rank": 26,
+        "importance": 0.05340036697947658,
+        "addresstype": "road",
+        "name": "Lê Đại Hành",
+        "display_name": "Lê Đại Hành, Khu phố 11, Phường Phú Thọ, Thành phố Hồ Chí Minh, 72415, Việt Nam",
+        "address": {
+            "road": "Lê Đại Hành",
+            "neighbourhood": "Khu phố 11",
+            "suburb": "Phường Phú Thọ",
+            "city": "Thành phố Hồ Chí Minh",
+            "ISO3166-2-lvl4": "VN-SG",
+            "postcode": "72415",
+            "country": "Việt Nam",
+            "country_code": "vn"
+        },
+        "boundingbox": [
+            "10.7639417",
+            "10.7687438",
+            "106.6523940",
+            "106.6557991"
+        ]
+    },
+    {
+        "place_id": 237394871,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "way",
+        "osm_id": 39513623,
+        "lat": "10.7642529",
+        "lon": "106.6557016",
+        "class": "highway",
+        "type": "secondary",
+        "place_rank": 26,
+        "importance": 0.05340036697947658,
+        "addresstype": "road",
+        "name": "Lê Đại Hành",
+        "display_name": "Lê Đại Hành, Khu phố 8, Phường Phú Thọ, Thành phố Hồ Chí Minh, 72415, Việt Nam",
+        "address": {
+            "road": "Lê Đại Hành",
+            "neighbourhood": "Khu phố 8",
+            "suburb": "Phường Phú Thọ",
+            "city": "Thành phố Hồ Chí Minh",
+            "ISO3166-2-lvl4": "VN-SG",
+            "postcode": "72415",
+            "country": "Việt Nam",
+            "country_code": "vn"
+        },
+        "boundingbox": [
+            "10.7626754",
+            "10.7658283",
+            "106.6545598",
+            "106.6568411"
+        ]
+    },
+    {
+        "place_id": 239919098,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "way",
+        "osm_id": 32580086,
+        "lat": "10.7609167",
+        "lon": "106.6579280",
+        "class": "highway",
+        "type": "secondary",
+        "place_rank": 26,
+        "importance": 0.05340036697947658,
+        "addresstype": "road",
+        "name": "Lê Đại Hành",
+        "display_name": "Lê Đại Hành, Khu phố 13, Phường Minh Phụng, Thủ Đức, Thành phố Hồ Chí Minh, 72415, Việt Nam",
+        "address": {
+            "road": "Lê Đại Hành",
+            "neighbourhood": "Khu phố 13",
+            "suburb": "Phường Minh Phụng",
+            "city": "Thủ Đức",
+            "ISO3166-2-lvl4": "VN-SG",
+            "postcode": "72415",
+            "country": "Việt Nam",
+            "country_code": "vn"
+        },
+        "boundingbox": [
+            "10.7597390",
+            "10.7621247",
+            "106.6571297",
+            "106.6587752"
+        ]
+    },
+    {
+        "place_id": 239208616,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "way",
+        "osm_id": 1272168433,
+        "lat": "10.7631078",
+        "lon": "106.6564007",
+        "class": "highway",
+        "type": "secondary",
+        "place_rank": 26,
+        "importance": 0.05340036697947658,
+        "addresstype": "road",
+        "name": "Lê Đại Hành",
+        "display_name": "Lê Đại Hành, Khu phố 9, Phường Phú Thọ, Thành phố Hồ Chí Minh, 72415, Việt Nam",
+        "address": {
+            "road": "Lê Đại Hành",
+            "neighbourhood": "Khu phố 9",
+            "suburb": "Phường Phú Thọ",
+            "city": "Thành phố Hồ Chí Minh",
+            "ISO3166-2-lvl4": "VN-SG",
+            "postcode": "72415",
+            "country": "Việt Nam",
+            "country_code": "vn"
+        },
+        "boundingbox": [
+            "10.7622657",
+            "10.7639417",
+            "106.6557991",
+            "106.6569888"
+        ]
+    },
+    {
+        "place_id": 241067911,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "way",
+        "osm_id": 706560073,
+        "lat": "10.7589095",
+        "lon": "106.6591710",
+        "class": "highway",
+        "type": "tertiary",
+        "place_rank": 26,
+        "importance": 0.05340036697947658,
+        "addresstype": "road",
+        "name": "Lê Đại Hành",
+        "display_name": "Lê Đại Hành, Khu phố 8, Phường Minh Phụng, Thủ Đức, Thành phố Hồ Chí Minh, 72415, Việt Nam",
+        "address": {
+            "road": "Lê Đại Hành",
+            "neighbourhood": "Khu phố 8",
+            "suburb": "Phường Minh Phụng",
+            "city": "Thủ Đức",
+            "ISO3166-2-lvl4": "VN-SG",
+            "postcode": "72415",
+            "country": "Việt Nam",
+            "country_code": "vn"
+        },
+        "boundingbox": [
+            "10.7580661",
+            "10.7597390",
+            "106.6587752",
+            "106.6595419"
+        ]
+    }
+]

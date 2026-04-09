@@ -1,0 +1,240 @@
+{
+    "name": "places/ChIJ55HbWqoodTERJ7Rf8Pp49hM",
+    "id": "ChIJ55HbWqoodTERJ7Rf8Pp49hM",
+    "types": [
+        "premise",
+        "street_address"
+    ],
+    "formattedAddress": "QPRC+HF4 Landmark 81, Điện Biên Phủ, Vinhomes Tân Cảng, Thạnh Mỹ Tây, Hồ Chí Minh, Vietnam",
+    "addressComponents": [
+        {
+            "longText": "Landmark 81",
+            "shortText": "Landmark 81",
+            "types": [
+                "premise"
+            ],
+            "languageCode": "vi"
+        },
+        {
+            "longText": "QPRC+HF4",
+            "shortText": "QPRC+HF4",
+            "types": [
+                "plus_code"
+            ],
+            "languageCode": "en"
+        },
+        {
+            "longText": "Đường Điện Biên Phủ",
+            "shortText": "Điện Biên Phủ",
+            "types": [
+                "route"
+            ],
+            "languageCode": "vi"
+        },
+        {
+            "longText": "Vinhomes Tân Cảng",
+            "shortText": "Vinhomes Tân Cảng",
+            "types": [
+                "neighborhood",
+                "political"
+            ],
+            "languageCode": "vi"
+        },
+        {
+            "longText": "Thành phố Hồ Chí Minh",
+            "shortText": "Thành phố Hồ Chí Minh",
+            "types": [
+                "locality",
+                "political"
+            ],
+            "languageCode": "vi"
+        },
+        {
+            "longText": "Hồ Chí Minh",
+            "shortText": "Hồ Chí Minh",
+            "types": [
+                "administrative_area_level_1",
+                "political"
+            ],
+            "languageCode": "vi"
+        },
+        {
+            "longText": "Vietnam",
+            "shortText": "VN",
+            "types": [
+                "country",
+                "political"
+            ],
+            "languageCode": "en"
+        }
+    ],
+    "location": {
+        "latitude": 10.7950932,
+        "longitude": 106.7220907
+    },
+    "viewport": {
+        "low": {
+            "latitude": 10.793776719708498,
+            "longitude": 106.72078831970849
+        },
+        "high": {
+            "latitude": 10.796474680291503,
+            "longitude": 106.72348628029151
+        }
+    },
+    "googleMapsUri": "https://maps.google.com/?cid=1438470150161413159&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA",
+    "utcOffsetMinutes": 420,
+    "adrFormatAddress": "QPRC+HF4 Landmark 81, <span class=\"street-address\">Điện Biên Phủ</span>, <span class=\"extended-address\">Vinhomes Tân Cảng</span>, <span class=\"locality\">Thạnh Mỹ Tây</span>, <span class=\"region\">Hồ Chí Minh</span>, <span class=\"country-name\">Vietnam</span>",
+    "iconMaskBaseUri": "https://maps.gstatic.com/mapfiles/place_api/icons/v2/generic_pinlet",
+    "iconBackgroundColor": "#7B9EB0",
+    "displayName": {
+        "text": "Landmark 81",
+        "languageCode": "vi"
+    },
+    "primaryTypeDisplayName": {
+        "text": "Building",
+        "languageCode": "en"
+    },
+    "primaryType": "premise",
+    "shortFormattedAddress": "QPRC+HF4, Điện Biên Phủ, Vinhomes Tân Cảng, Thạnh Mỹ Tây",
+    "pureServiceAreaBusiness": false,
+    "addressDescriptor": {
+        "landmarks": [
+            {
+                "name": "places/ChIJEQnz-MIndTERzRrJ-HNQrDY",
+                "placeId": "ChIJEQnz-MIndTERzRrJ-HNQrDY",
+                "displayName": {
+                    "text": "Landmark 81",
+                    "languageCode": "en"
+                },
+                "types": [
+                    "establishment",
+                    "point_of_interest",
+                    "tourist_attraction"
+                ],
+                "spatialRelationship": "BESIDE",
+                "straightLineDistanceMeters": 4.073647,
+                "travelDistanceMeters": 1.4974937
+            },
+            {
+                "name": "places/ChIJ8d-j2LgpdTERHK8vrf2xn2Q",
+                "placeId": "ChIJ8d-j2LgpdTERHK8vrf2xn2Q",
+                "displayName": {
+                    "text": "Starbucks Vincom Landmark 81",
+                    "languageCode": "en"
+                },
+                "types": [
+                    "cafe",
+                    "establishment",
+                    "food",
+                    "point_of_interest",
+                    "store"
+                ],
+                "spatialRelationship": "BESIDE",
+                "straightLineDistanceMeters": 4.2214785,
+                "travelDistanceMeters": 1.0219066
+            },
+            {
+                "name": "places/ChIJp1Ai7i0pdTERgZgLtG0gLk8",
+                "placeId": "ChIJp1Ai7i0pdTERgZgLtG0gLk8",
+                "displayName": {
+                    "text": "Phúc Long Coffee & Tea Landmark 81",
+                    "languageCode": "en"
+                },
+                "types": [
+                    "cafe",
+                    "establishment",
+                    "food",
+                    "point_of_interest",
+                    "store"
+                ],
+                "spatialRelationship": "BESIDE",
+                "straightLineDistanceMeters": 6.6854787,
+                "travelDistanceMeters": 1.0219066
+            },
+            {
+                "name": "places/ChIJS_cw-6sodTERcMMY8_KA9VU",
+                "placeId": "ChIJS_cw-6sodTERcMMY8_KA9VU",
+                "displayName": {
+                    "text": "Vinmec Central Park International Hospital",
+                    "languageCode": "en"
+                },
+                "types": [
+                    "establishment",
+                    "health",
+                    "hospital",
+                    "point_of_interest"
+                ],
+                "straightLineDistanceMeters": 232.69844,
+                "travelDistanceMeters": 413.99347
+            },
+            {
+                "name": "places/ChIJZUIb7NcodTER60ozcybLRL8",
+                "placeId": "ChIJZUIb7NcodTER60ozcybLRL8",
+                "displayName": {
+                    "text": "L.andm.ark 81",
+                    "languageCode": "vi"
+                },
+                "types": [
+                    "establishment",
+                    "point_of_interest"
+                ],
+                "spatialRelationship": "BESIDE",
+                "straightLineDistanceMeters": 6.8717275,
+                "travelDistanceMeters": 0.6904373
+            }
+        ],
+        "areas": [
+            {
+                "name": "places/ChIJhUcSj6kodTERF0Dvt4G882E",
+                "placeId": "ChIJhUcSj6kodTERF0Dvt4G882E",
+                "displayName": {
+                    "text": "Vinhomes Central Park",
+                    "languageCode": "en"
+                },
+                "containment": "WITHIN"
+            },
+            {
+                "name": "places/ChIJb1BXs6godTERTsAnG6jpBzI",
+                "placeId": "ChIJb1BXs6godTERTsAnG6jpBzI",
+                "displayName": {
+                    "text": "Thanh My Tay",
+                    "languageCode": "en"
+                },
+                "containment": "WITHIN"
+            },
+            {
+                "name": "places/ChIJc9HKHAImdTERJQhPRlXKAjc",
+                "placeId": "ChIJc9HKHAImdTERJQhPRlXKAjc",
+                "displayName": {
+                    "text": "Vinhomes Central Park",
+                    "languageCode": "en"
+                },
+                "containment": "NEAR"
+            }
+        ]
+    },
+    "googleMapsLinks": {
+        "directionsUri": "https://www.google.com/maps/dir//''/data=!4m7!4m6!1m1!4e2!1m2!1m1!1s0x317528aa5adb91e7:0x13f678faf05fb427!3e0?g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA",
+        "placeUri": "https://maps.google.com/?cid=1438470150161413159&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA",
+        "photosUri": "https://www.google.com/maps/place//data=!4m3!3m2!1s0x317528aa5adb91e7:0x13f678faf05fb427!10e5?g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA"
+    },
+    "timeZone": {
+        "id": "Asia/Saigon"
+    },
+    "postalAddress": {
+        "regionCode": "VN",
+        "languageCode": "en",
+        "administrativeArea": "Ho Chi Minh",
+        "locality": "Thanh My Tay",
+        "sublocality": "Vinhomes Central Park",
+        "addressLines": [
+            "QPRC+HF4",
+            "Điện Biên Phủ"
+        ]
+    },
+    "googleMapsTypeLabel": {
+        "text": "Building",
+        "languageCode": "en"
+    }
+}

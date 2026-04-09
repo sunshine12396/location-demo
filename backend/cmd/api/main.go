@@ -1,40 +1,49 @@
 package main
 
 import (
-	"database/sql"
 	"log"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq"
 
 	"github.com/example/location-demo/internal/config"
-	"github.com/example/location-demo/internal/external"
+	"github.com/example/location-demo/internal/external/google"
 	"github.com/example/location-demo/internal/location"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func main() {
 	// 1. Load configuration
 	cfg := config.Load()
 
-	// 2. Connect to PostgreSQL
-	db, err := sql.Open("postgres", cfg.DSN())
+	// 2. Connect to PostgreSQL using GORM
+	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
 
-	if err := db.Ping(); err != nil {
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("Failed to get underlying SQL DB: %v", err)
+	}
+	defer sqlDB.Close()
+
+	if err := sqlDB.Ping(); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
+
 	log.Println("✅ Connected to PostgreSQL")
 
 	// 3. Wire dependencies (Dependency Injection)
 	repo := location.NewPostgresRepository(db)
 
-	// Create the external provider using OpenStreetMap (OSM)
-	extApi := external.NewOSMClient()
+	// Create the external provider using Google Places API
+	extApi := google.NewGooglePlacesClient(cfg.ExternalAPIKey)
 
-	svc := location.NewService(repo, extApi)
+	svc := location.NewService(repo, extApi, cfg.LocationSyncDays)
 	handler := location.NewHandler(svc)
 
 	// 4. Setup Gin router
